@@ -1,0 +1,90 @@
+---
+title: "Data Science--NECC Proposal"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(ggmap)
+library(ggplot2)
+library(tidyverse)
+library(magrittr)
+library(readr)
+library(sf)
+library(ggspatial)
+
+
+theme_set(theme_bw(base_size=22))
+
+```
+
+
+## Introduction
+  The Northwest Atlantic is a highly productive ecosystem with diverse environments. It holds very high economic value as well with commercial fisheries cumulatively worth \$100 million (this is a made up number; but find a citation) and recreational fisheries supporting an additional \$50 million and 10,000 jobs (made up, need a citation). However, while the region is a focal point for marine commerce, it is also a central location in the progressive climate change occurring around the world. The Gulf of Maine, the northern end of the Northwest Atlantic, is warming faster than 99.9% of the world's oceans (Pershing et al. 2015). The water body is fed primarily by cool Arctic waters, a region showing strong signals of climate change, that circulate in the deep basins, allowing them warm further. The Gulf of Maine is also linked to the south to the regions of the Georges Bank and Long Island Sound of Southern New England and the Mid-Atlantic Bight further south. These waters have historically been connected transiantly, but have shown increasing homogenization in recent years.
+  
+  As the Gulf of Maine circulating waters allow it to warm more quickly than its southern neighbors, the thermal conditions of this northern region have become more similar to past and present conditions of those areas. As such, recent decades have shown a rapid onset of species encroaching into the Gulf of Maine that had, historically, been seasonal visitors at most. New arrivals or expanding populations include those of the Atlantic blue crab (_Callinectes sapidus_), black sea bass (_Centropristis striata_), butterfish (_Peprilus triacanthus_), tautog (_Tautoga onitis_), and longfin squid (_Doryteuthis pealeii_) among many more. Similarly, species that have been historically abundant and important contributors to the Gulf of Maine ecosystem have shown appreciable declines due, at least in part, to climate change. These struggling species of the region include Atlantic cod (_Gadus morhua_), Northern shrimp (_Pandalus borealis_), Atlantic salmon (_Salmo salar_), with the collapse of American lobster (_Americanus homarus_) on the horizon in the eyes of many researchers. The reason for these changes in species' abundance within the region is due to the widespread pattern of range shifts experienced by marine organisms.
+  
+  Range shifts.
+  
+  Fish physiological demands, double whammy.
+  
+  Mismatch driven by spatial discontinuity.
+  
+  Trophic interactions and historical changes.
+  
+  Objectives for the dissertation.
+  
+## Methods
+  NMFS Bottom Trawl Survey and Food Habits Database
+  
+  
+``` {r data,include=F}
+
+
+load("Data/googleMap.zoom6.eastCoast.R")
+load("Data/prey19.RData")
+allTrawls<-read_csv("Data/allTrawls.csv")
+statAreas<-st_read("Data/Statistical_Areas_2010_withNames.shp",quiet=T)
+statAreas<-filter(statAreas,Id%in%allTrawls$AREA)
+statAreas<-st_transform(statAreas,4326)
+
+prey19%<>%
+  mutate(geoarea=factor(geoarea,levels=c("MAB","SNE","GB","GoM","ScS")))
+
+
+#Trying with ggspatial
+world<-map_data("world")
+states<-map_data("state")
+
+
+```
+
+
+
+
+``` {r mapping, echo=F, message=F, warning=F,fig.width=11,fig.height=11,fig.cap="Map of the trawl positions overlain by the NMFS Statistical areas."}
+
+
+ggplot()+
+  geom_polygon(data=world,aes(long,lat,group=group),fill="antiquewhite")+
+  geom_polygon(data=states,aes(long,lat,group=group),fill="transparent",color="grey50")+
+  geom_spatial_point(data=prey19,aes(-1*declon,declat,color=geoarea),crs=4326)+
+  geom_sf(data=statAreas,fill="transparent",col="black")+
+  scale_color_manual(values=colorspace::rainbow_hcl(5,c=100,end=290),name="Geographic\nRegion")+
+  guides(color=guide_legend(override.aes = list(size=9)))+
+  annotation_scale(location="br",width_hint=0.4,height=unit(0.125,"in"),
+                   pad_x=unit(0.25,"in"),pad_y=unit(0.4,"in"),text_cex=1.2)+
+  geom_rect(aes(xmin=-63.35,xmax=-62.5,ymin=35.8,ymax=36.2),fill="azure1")+
+  annotation_north_arrow(location="br",pad_x=unit(0.5,"in"),pad_y=unit(0.75,"in"),
+                         style = north_arrow_fancy_orienteering(text_size=15,line_width=1.25),
+                         height=unit(1,"in"),width=unit(0.9,"in"))+
+  coord_sf(xlim=c(-77.8,st_bbox(statAreas)$xmax),
+           ylim=c(35.2,st_bbox(statAreas)$ymax))+
+  theme(legend.position=c(0.225,0.8),legend.background=element_rect(color="black"),
+        panel.grid.major = element_line(color=rgb(0.5,0.5,0.5,alpha=0.7),linetype="dashed",size=0.5),
+        panel.background = element_rect(fill="azure1"))+
+  xlab("Longitude")+ylab("Latitude")
+
+
+```
