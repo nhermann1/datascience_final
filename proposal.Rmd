@@ -1,6 +1,7 @@
 ---
 title: "Data Science--NECC Proposal"
 output: pdf_document
+bibliography: Bibliography.bib
 ---
 
 ```{r setup, include=FALSE}
@@ -24,11 +25,11 @@ seasonPal2<-c("deepskyblue4","yellowgreen","goldenrod1","orange3") #BEST
 
 
 ## Introduction
-|   The Northwest Atlantic is a highly productive ecosystem with diverse environments. It holds very high economic value as well with commercial fisheries cumulatively worth \$100 million (this is a made up number; but find a citation) and recreational fisheries supporting an additional \$50 million and 10,000 jobs (made up, need a citation). However, while the region is a focal point for marine commerce, it is also a central location in the progressive climate change occurring around the world. The Gulf of Maine, the northern end of the Northwest Atlantic, is warming faster than 99.9% of the world's oceans (Pershing et al. 2015). The water body is fed primarily by cool Arctic waters, a region showing strong signals of climate change, that circulate in the deep basins, allowing them warm further. The Gulf of Maine is also linked to the south to the regions of the Georges Bank and Long Island Sound of Southern New England and the Mid-Atlantic Bight further south. These waters have historically been connected transiantly, but have shown increasing homogenization in recent years.
+|   The Northwest Atlantic is a highly productive ecosystem with diverse environments. It holds very high economic value as well with commercial fisheries cumulatively worth \$1.3 billion [@noaa_fisheries_2021_2021; @noaa_fisheries_2021_2021-1]. However, while the region is a focal point for marine commerce, it is also a central location in the progressive climate change occurring around the world. The Gulf of Maine, the northern end of the Northwest Atlantic, is warming faster than 99.9% of the world's oceans [@pershing_evaluating_2015]. The water body is fed primarily by cool Arctic waters, a region showing strong signals of climate change, that circulate in the deep basins, allowing them warm further. The Gulf of Maine is also linked to the south to the regions of the Georges Bank and Long Island Sound of Southern New England and the Mid-Atlantic Bight further south. These waters have historically been connected transiently, but have shown increasing homogenization in recent years.
   
 |   As the Gulf of Maine circulating waters allow it to warm more quickly than its southern neighbors, the thermal conditions of this northern region have become more similar to past and present conditions of those areas. As such, recent decades have shown a rapid onset of species encroaching into the Gulf of Maine that had, historically, been seasonal visitors at most. New arrivals or expanding populations include those of the Atlantic blue crab (_Callinectes sapidus_), black sea bass (_Centropristis striata_), butterfish (_Peprilus triacanthus_), tautog (_Tautoga onitis_), and longfin squid (_Doryteuthis pealeii_) among many more. Similarly, species that have been historically abundant and important contributors to the Gulf of Maine ecosystem have shown appreciable declines due, at least in part, to climate change. These struggling species of the region include Atlantic cod (_Gadus morhua_), Northern shrimp (_Pandalus borealis_), Atlantic salmon (_Salmo salar_), with the collapse of American lobster (_Americanus homarus_) on the horizon in the eyes of many researchers. The reason for these changes in species' abundance within the region is due to the widespread pattern of range shifts experienced by marine organisms.
-|
-Range shifts.
+
+|   Species, both in marine and terrestrial ecosystems, rely on habitable conditions that are specific to their needs. Due to progressive climate change, the conditions of a local area may become inhabitable for a species or individual that previously were. This change can result in contractions of a population's range. However, as condition changes are global, it is probable that an area previously inhabitable becomes habitable for that same species allow an expansion of their range. These two components, a push and pull on a population's range, can happen simultaneously resulting in an other shift in the areas used by a species. Work has shown that the expansion or leading edge of range shifts responds more quickly to climate change than does contraction or the lagging edge [@fredston-hermann_cold_2020]. 
   
 |
 Fish physiological demands, double whammy.
@@ -61,46 +62,21 @@ prey19%<>%
   mutate(geoarea=factor(geoarea,levels=c("MAB","SNE","GB","GoM","ScS")))
 
 
-#Trying with ggspatial
+#Using shapefiles to build a clean map
 world<-map_data("world")
 states<-map_data("state")
 
 
-```
-
-
-
-
-``` {r mapping, echo=F, message=F, warning=F,fig.width=11,fig.height=11,fig.cap="Map of the trawl positions overlain by the NMFS Statistical areas."}
-
-
-ggplot()+
-  geom_polygon(data=world,aes(long,lat,group=group),fill="antiquewhite")+
-  geom_polygon(data=states,aes(long,lat,group=group),fill="transparent",color="grey50")+
-  geom_spatial_point(data=prey19,aes(-1*declon,declat,color=geoarea),crs=4326)+
-  geom_sf(data=statAreas,fill="transparent",col="black")+
-  scale_color_manual(values=colorspace::rainbow_hcl(5,c=100,end=290),name="Geographic\nRegion")+
-  guides(color=guide_legend(override.aes = list(size=9)))+
-  annotation_scale(location="br",width_hint=0.4,height=unit(0.125,"in"),
-                   pad_x=unit(0.25,"in"),pad_y=unit(0.4,"in"),text_cex=1.2)+
-  geom_rect(aes(xmin=-63.35,xmax=-62.5,ymin=35.8,ymax=36.2),fill="azure1")+
-  annotation_north_arrow(location="br",pad_x=unit(0.5,"in"),pad_y=unit(0.75,"in"),
-                         style = north_arrow_fancy_orienteering(text_size=15,line_width=1.25),
-                         height=unit(1,"in"),width=unit(0.9,"in"))+
-  coord_sf(xlim=c(-77.8,st_bbox(statAreas)$xmax),
-           ylim=c(35.2,st_bbox(statAreas)$ymax))+
-  theme(legend.position=c(0.225,0.8),legend.background=element_rect(color="black"),
-        panel.grid.major = element_line(color=rgb(0.5,0.5,0.5,alpha=0.7),linetype="dashed",size=0.5),
-        panel.background = element_rect(fill="azure1"))+
-  xlab("Longitude")+ylab("Latitude")
+#The names of my species, just to have them nice and handy for later
+myspecies_sci<-unique(str_to_upper(prey19$pdscinam))
 
 
 ```
 
 
+``` {r editing, include=F}
 
-
-``` {r data summary, echo=F, message=F,warning=F,fig.width=20,fig.height=15,fig.cap="Number of diets collected for each of 9 target predator species by the National Marine Fisheries Service during the annual Spring-Fall Bottom Trawl Survey since 1973. Differences represent predator availability as well as research prioritization, both of which have varied over time. The minimum number of diets collected by a season of trawls is noted in each panel, along with the season in which it occurred. If the minimum number of diets for a species occurred in multiple seasons, the number of seasons is listed instead.\\label{fig:dietNum}"}
+#Modifying the data as needed
 
 #Available diets
 prey19<-prey19%>%
@@ -136,33 +112,6 @@ min<-uniquePrey19%>%
   summarise(min=min,
             minyearseason=ifelse(n()>1,paste(n(),"times"),paste(minseason,minyear)))%>%distinct()
 
-
-uniquePrey19%>%
-  filter(!is.na(year)&season%in%c("SPRING","FALL"))%>%
-  mutate(pdcomnam=str_to_title(pdcomnam),
-         year=as.factor(year),
-         season=factor(str_to_sentence(season),levels=c("Spring","Fall")))%>%
-  group_by(pdcomnam,year,season,.drop=F)%>%
-  summarise(count=n())%>%distinct()%>%
-  filter(count>0)%>%ungroup()%>%
-  mutate(yearseason=ifelse(season=="Spring",as.numeric(as.character(year))-0.25,as.numeric(as.character(year))+0.25),
-         g = c(0, cumsum(diff(yearseason) > 0.5))) %>%
- ggplot()+
-  geom_line(aes(yearseason,count,color=pdcomnam,group=g),size=1.5)+
-  geom_point(aes(yearseason,count,fill=season,color=pdcomnam,group=g),size=3,shape=21,stroke=2)+
-  geom_text(data=min,aes(2010,2010,label=paste0("Min=",min,": ",minyearseason)),size=7)+
-  scale_color_manual(values=colorspace::rainbow_hcl(9,c=100,l=60),guide="none")+
-  scale_fill_manual(values=seasonPal2[c(2,4)],name="Season")+
-  scale_y_continuous(expand=expansion(mult=c(0.035,0.1)),name="Number of Diets Collected")+
-  scale_x_continuous(name="Year")+
-  guides(fill=guide_legend(override.aes=list(stroke=0.5,size=6)))+
-  facet_wrap(~pdcomnam)
-
-
-```
-
-
-``` {r prey summary, echo=F, message=F, warning=F,fig.height=6,fig.width=10,fig.cap="Number of unique prey names at each level of resolution. General, Analytical, and Collection scales refer to groupings provided by the National Marine Fisheries Service; Prey name is the most specific a visual observer could identify an item to; and cf. Garrison and Link, 2000 refers to that grouping used in their feeding guild analyses.\\label{fig:preynames}"}
 
 
 #The categories from Garrison and Link, 2000
@@ -235,6 +184,98 @@ itemDetails<-prey19%>%
   dplyr::select(pynam,gensci,analsci,collsci,total_pynam:coll_pynam)%>%unique()
 itemDetails<-itemDetails[,c("gensci","analsci","collsci","pynam","total_gennam","total_glnam","total_analnam","total_colnam",
                             "total_pynam","gen_analnam","gen_colnam","gen_pynam","anal_colnam","anal_pynam","coll_pynam")]  
+
+
+
+
+
+#How often are each of the predators prey to each of the predators
+speciesPrey<-prey19%>%
+  group_by(pdscinam)%>%
+  mutate(total_items=n())%>%
+  filter(pynam%in%myspecies_sci)%>%
+  mutate(pynam=factor(pynam,levels=myspecies_sci),
+         pdscinam=factor(pdscinam,levels=myspecies_sci))%>%
+  count(pynam,pdscinam,total_items,.drop=F,name="n_prey")%>%
+  mutate(prop_prey=n_prey/total_items,
+         preyLab=str_to_sentence(pynam),
+         preyLab=factor(preyLab,levels=str_to_sentence(myspecies_sci)),
+         pdscinam=gsub(" ","\n",str_to_sentence(pdscinam)))%>%
+  group_by(pdscinam)%>%
+  mutate(total_prop=sum(prop_prey,na.rm=T))%>%
+  group_by(pynam)%>%
+  mutate(total_eaten=sum(n_prey),
+         prop_eaten=total_eaten/nrow(prey19),
+         nchars=nchar(as.character(preyLab)))
+speciesPrey[is.na(speciesPrey)]<-0
+
+
+```
+
+
+
+
+
+
+``` {r mapping, echo=F, message=F, warning=F,fig.width=11,fig.height=11,fig.cap="Map of the trawl positions overlain by the NMFS Statistical areas."}
+
+
+
+ggplot()+
+  geom_polygon(data=world,aes(long,lat,group=group),fill="antiquewhite")+
+  geom_polygon(data=states,aes(long,lat,group=group),fill="transparent",color="grey50")+
+  geom_spatial_point(data=prey19,aes(-1*declon,declat,color=geoarea),crs=4326)+
+  geom_sf(data=statAreas,fill="transparent",col="black")+
+  scale_color_manual(values=colorspace::rainbow_hcl(5,c=100,end=290),name="Geographic\nRegion")+
+  guides(color=guide_legend(override.aes = list(size=9)))+
+  annotation_scale(location="br",width_hint=0.4,height=unit(0.125,"in"),
+                   pad_x=unit(0.25,"in"),pad_y=unit(0.4,"in"),text_cex=1.2)+
+  geom_rect(aes(xmin=-63.35,xmax=-62.5,ymin=35.8,ymax=36.2),fill="azure1")+
+  annotation_north_arrow(location="br",pad_x=unit(0.5,"in"),pad_y=unit(0.75,"in"),
+                         style = north_arrow_fancy_orienteering(text_size=15,line_width=1.25),
+                         height=unit(1,"in"),width=unit(0.9,"in"))+
+  coord_sf(xlim=c(-77.8,st_bbox(statAreas)$xmax),
+           ylim=c(35.2,st_bbox(statAreas)$ymax))+
+  theme(legend.position=c(0.225,0.8),legend.background=element_rect(color="black"),
+        panel.grid.major = element_line(color=rgb(0.5,0.5,0.5,alpha=0.7),linetype="dashed",size=0.5),
+        panel.background = element_rect(fill="azure1"))+
+  xlab("Longitude")+ylab("Latitude")
+
+
+```
+
+
+
+
+``` {r data summary, echo=F, message=F,warning=F,fig.width=20,fig.height=15,fig.cap="Number of diets collected for each of 9 target predator species by the National Marine Fisheries Service during the annual Spring-Fall Bottom Trawl Survey since 1973. Differences represent predator availability as well as research prioritization, both of which have varied over time. The minimum number of diets collected by a season of trawls is noted in each panel, along with the season in which it occurred. If the minimum number of diets for a species occurred in multiple seasons, the number of seasons is listed instead.\\label{fig:dietNum}"}
+
+uniquePrey19%>%
+  filter(!is.na(year)&season%in%c("SPRING","FALL"))%>%
+  mutate(pdcomnam=str_to_title(pdcomnam),
+         year=as.factor(year),
+         season=factor(str_to_sentence(season),levels=c("Spring","Fall")))%>%
+  group_by(pdcomnam,year,season,.drop=F)%>%
+  summarise(count=n())%>%distinct()%>%
+  filter(count>0)%>%ungroup()%>%
+  mutate(yearseason=ifelse(season=="Spring",as.numeric(as.character(year))-0.25,as.numeric(as.character(year))+0.25),
+         g = c(0, cumsum(diff(yearseason) > 0.5))) %>%
+ ggplot()+
+  geom_line(aes(yearseason,count,color=pdcomnam,group=g),size=1.5)+
+  geom_point(aes(yearseason,count,fill=season,color=pdcomnam,group=g),size=3,shape=21,stroke=2)+
+  geom_text(data=min,aes(2010,2010,label=paste0("Min=",min,": ",minyearseason)),size=7)+
+  scale_color_manual(values=colorspace::rainbow_hcl(9,c=100,l=60),guide="none")+
+  scale_fill_manual(values=seasonPal2[c(2,4)],name="Season")+
+  scale_y_continuous(expand=expansion(mult=c(0.035,0.1)),name="Number of Diets Collected")+
+  scale_x_continuous(name="Year")+
+  guides(fill=guide_legend(override.aes=list(stroke=0.5,size=6)))+
+  facet_wrap(~pdcomnam)
+
+
+```
+
+
+``` {r prey summary, echo=F, message=F, warning=F,fig.height=6,fig.width=10,fig.cap="Number of unique prey names at each level of resolution. General, Analytical, and Collection scales refer to groupings provided by the National Marine Fisheries Service; Prey name is the most specific a visual observer could identify an item to; and cf. Garrison and Link, 2000 refers to that grouping used in their feeding guild analyses.\\label{fig:preynames}"}
+
 
 #How many are in each of the prey levels
 itemDetails%>%
@@ -358,31 +399,6 @@ The predators show signs of predation upon each other, however this is largely f
 
 ``` {r investigating, echo=F,message=F,warning=F,fig.width=12,fig.height=8,fig.cap="Proportion of consumption for each predator species of the other predator species, including cannibalism. Red lines represent the total proportion on self and other target predator species. Prey names include the number of instances of predation upon that species. Note square-root scale for proportions.\\label{fig:selfprey}"}
 
-#The names of my species, just to have them nice and handy
-myspecies_sci<-unique(str_to_upper(prey19$pdscinam))
-
-
-
-#How often are each of the predators prey to each of the predators
-speciesPrey<-prey19%>%
-  group_by(pdscinam)%>%
-  mutate(total_items=n())%>%
-  filter(pynam%in%myspecies_sci)%>%
-  mutate(pynam=factor(pynam,levels=myspecies_sci),
-         pdscinam=factor(pdscinam,levels=myspecies_sci))%>%
-  count(pynam,pdscinam,total_items,.drop=F,name="n_prey")%>%
-  mutate(prop_prey=n_prey/total_items,
-         preyLab=str_to_sentence(pynam),
-         preyLab=factor(preyLab,levels=str_to_sentence(myspecies_sci)),
-         pdscinam=gsub(" ","\n",str_to_sentence(pdscinam)))%>%
-  group_by(pdscinam)%>%
-  mutate(total_prop=sum(prop_prey,na.rm=T))%>%
-  group_by(pynam)%>%
-  mutate(total_eaten=sum(n_prey),
-         prop_eaten=total_eaten/nrow(prey19),
-         nchars=nchar(as.character(preyLab)))
-speciesPrey[is.na(speciesPrey)]<-0
-
 ggplot(speciesPrey,aes(fct_reorder(pdscinam,total_prop),prop_prey,fill=preyLab))+
   geom_col(position = "dodge",color="black",size=0.5)+
   geom_errorbar(aes(ymin=total_prop,ymax=total_prop), color = "firebrick3") +
@@ -408,7 +424,7 @@ ggplot(speciesPrey,aes(fct_reorder(pdscinam,total_prop),prop_prey,fill=preyLab))
 
 
 
-
+# References
 
 
 
