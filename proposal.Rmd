@@ -29,24 +29,24 @@ seasonPal2<-c("deepskyblue4","yellowgreen","goldenrod1","orange3") #BEST
   
 |   As the Gulf of Maine circulating waters allow it to warm more quickly than its southern neighbors, the thermal conditions of this northern region have become more similar to past and present conditions of those areas. As such, recent decades have shown a rapid onset of species encroaching into the Gulf of Maine that had, historically, been seasonal visitors at most. New arrivals or expanding populations include those of the Atlantic blue crab (_Callinectes sapidus_), black sea bass (_Centropristis striata_), butterfish (_Peprilus triacanthus_), tautog (_Tautoga onitis_), and longfin squid (_Doryteuthis pealeii_) among many more. Similarly, species that have been historically abundant and important contributors to the Gulf of Maine ecosystem have shown appreciable declines due, at least in part, to climate change. These struggling species of the region include Atlantic cod (_Gadus morhua_), Northern shrimp (_Pandalus borealis_), Atlantic salmon (_Salmo salar_), with the collapse of American lobster (_Americanus homarus_) on the horizon in the eyes of many researchers. The reason for these changes in species' abundance within the region is due to the widespread pattern of range shifts experienced by marine organisms.
 
-|   Species, both in marine and terrestrial ecosystems, rely on habitable conditions that are specific to their needs. Due to progressive climate change, the conditions of a local area may become inhabitable for a species or individual that previously were. This change can result in contractions of a population's range. However, as condition changes are global, it is probable that an area previously inhabitable becomes habitable for that same species allow an expansion of their range. These two components, a push and pull on a population's range, can happen simultaneously resulting in an other shift in the areas used by a species. Work has shown that the expansion or leading edge of range shifts responds more quickly to climate change than does contraction or the lagging edge [@fredston-hermann_cold_2020]. 
-  
-|
-Fish physiological demands, double whammy.
-  
-|
-Mismatch driven by spatial discontinuity.
+|   Species, both in marine and terrestrial ecosystems, rely on habitable conditions that are specific to their needs. Due to progressive climate change, the conditions of a local area may become inhabitable for a species or individual that previously were. This change can result in contractions of a population's range. However, as condition changes are global, it is probable that an area previously inhabitable becomes habitable for that same species allow an expansion of their range. These two components, a push and pull on a population's range, can happen simultaneously resulting in an other shift in the areas used by a species. Work has shown that the expansion or leading edge of range shifts responds more quickly to climate change than does contraction or the lagging edge [@fredston-hermann_cold_2020]. While the general case, this directional shift in population ranges is species-specific [@fredston-hermann_cold_2020] with species moving at different rates and even different directions [@chen_rapid_2011; @pinsky_climate-driven_2020]. Even further, many species instead seek cooler water temperatures by deepening their distribution [@dulvy_climate_2008]. This plurality of responses exists both around the globe as well as within a shared community [@pinsky_climate-driven_2020]; disconnecting previously interconnected communities that had been based on overlapping distributions of species. It is theorized that climate influences marine habitat suitability more strongly at the cold, leading edge whereas biotic interactions dominate at warmer, trailing edges [@fredston-hermann_cold_2020]. These two components of species range may, additionally, interact to produce a 'double whammy' for marine populations.
 
-|
-Trophic interactions and historical changes.
+|   Fish, like many marine organisms, are poikilothermic meaning their body temperatures are able to range widely, pre-dominantly due to changes in their environmental temperature. Due to this substantial influence of climate conditions on the internal conditions of the individual, the physiology of fishes can range widely. Though non-linear and species-specific, a universally positive interaction of temperature and metabolic demand exists for fish. Therefore, with the rising temperatures fish experience, they are expected to increase their metabolism. Such increases require additional forage to maintain consistent individual growth and broader population biomass, though adaptations exist to reduce this pressure [@auer_flexibility_2015]. However, forage may also be struggling to maintain biomass with increased metabolisms, declining in energy density, or shifting to new locations that are less accessible for a predator. Therefore, as a global phenomenon climate change can influence predators both directly--by physiological demands of the species--and indirectly--by similarly impacting lower trophic levels. As such, predators are expected and shown to feel greater threats due to climate change than species lower in trophic level and/or with shorter generation times [@thackeray_trophic_2010].
 
-|
-Objectives for the dissertation.
+|   As marine communities are subject to a variety of changes with complex interactions, there is potential for changes in diets of the fish predators within these communities. My objective is to conduct retrospective analyses on the diets of important predators that represent a variety of taxa and showcasing a range spatial responses. Using historical diet contents from these predators across a broad spatial area allows spatio-temporal analyses to characterize the magnitude and direction of foraging changes. Defining the patterns in dietary shifts can provide additional metrics--beyond reproductive, mobility, and habitat traits previously employed [@hare_vulnerability_2016]--to characterize the vulnerability of niches or taxa to climate change. Ultimately, informing fishers and managers about the community-wide dietary changes impact the vulnerability of those large predatory fishes that are commonly harvested can aid in their conservation and help to stabilize the community in the future.
 
 
 ## Methods
   NMFS Bottom Trawl Survey and Food Habits Database
   
+  
+  
+## Discussion
+
+The predators show signs of predation upon each other, however this is largely focused on Silver Hake, even when that requires cannibalism (Figure \ref{fig:selfprey}).
+
+  
+## Figures
   
 ``` {r data,include=F}
 
@@ -394,8 +394,6 @@ grid.arrange(a,s,g,nrow=2,layout_matrix=rbind(c(1,1,1,2),
 ```
 
 
-The predators show signs of predation upon each other, however this is largely focused on Silver Hake, even when that requires cannibalism (Figure \ref{fig:selfprey}).
-
 
 ``` {r investigating, echo=F,message=F,warning=F,fig.width=12,fig.height=8,fig.cap="Proportion of consumption for each predator species of the other predator species, including cannibalism. Red lines represent the total proportion on self and other target predator species. Prey names include the number of instances of predation upon that species. Note square-root scale for proportions.\\label{fig:selfprey}"}
 
@@ -406,7 +404,7 @@ ggplot(speciesPrey,aes(fct_reorder(pdscinam,total_prop),prop_prey,fill=preyLab))
   scale_x_discrete(name="Predator Species")+
   scale_y_sqrt(name="Proportion of Predator Diet",expand=expansion(add=c(0.001,0.01)))+
   scale_fill_viridis_d(name="Prey Species", 
-                       labels=paste0(speciesPrey$preyLab,strrep(" ",24-speciesPrey$nchars),"(n=",speciesPrey$total_eaten,")"))+
+                       labels=paste0(speciesPrey$preyLab,strrep(" ",25-speciesPrey$nchars),"(n=",speciesPrey$total_eaten,")"))+
   theme(legend.position=c(0.7,0.25),legend.background=element_rect(color="black"),
         legend.text=element_text(family="mono",size=15))+
   coord_flip()
@@ -424,7 +422,7 @@ ggplot(speciesPrey,aes(fct_reorder(pdscinam,total_prop),prop_prey,fill=preyLab))
 
 
 
-# References
+## References
 
 
 
