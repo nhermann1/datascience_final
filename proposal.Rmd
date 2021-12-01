@@ -1,11 +1,15 @@
 ---
 title: "Data Science--NECC Proposal"
-output: pdf_document
+author: "Nate Hermann"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output: 
+  pdf_document:
+    toc: TRUE
 bibliography: Bibliography.bib
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE, dev = "cairo_pdf")
+knitr::opts_chunk$set(echo = TRUE, dev = "cairo_pdf",cache=T,fig.align="left",fig.pos="!h")
 
 
 library(ggplot2)
@@ -15,6 +19,8 @@ library(readr)
 library(sf)
 library(ggspatial)
 library(gridExtra)
+library(moments)
+library(dendextend)
 
 
 theme_set(theme_bw(base_size=22))
@@ -28,6 +34,7 @@ seasonPal2<-c("deepskyblue4","yellowgreen","goldenrod1","orange3") #BEST
 
 load("Data/googleMap.zoom6.eastCoast.R")
 load("Data/prey19.RData")
+load("Data/pylen19.RData")
 allTrawls<-read_csv("Data/allTrawls.csv")
 statAreas<-st_read("Data/Statistical_Areas_2010_withNames.shp",quiet=T)
 statAreas<-filter(statAreas,Id%in%allTrawls$AREA)
@@ -44,7 +51,7 @@ states<-map_data("state")
 
 #The names of my species, just to have them nice and handy for later
 myspecies_sci<-unique(str_to_upper(prey19$pdscinam))
-
+myspecies_com<-unique(str_to_title(prey19$pdcomnam))
 
 ```
 
@@ -185,12 +192,105 @@ speciesPrey<-prey19%>%
 speciesPrey[is.na(speciesPrey)]<-0
 
 
+#Levin's Niche Breadth, in different seasons
+
+#Niche breadth function
+B<-function(p) {
+  a<-apply(p,2,sum)/sum(p)
+  b<-(1/(sum(a^2))-1)/(length(a)-1)
+  return(b)
+}
+#Bootstrapping function
+myboot <- function(data, num) {
+  resamples <- lapply(1:num, function(i) data[sample(1:nrow(data), replace=T),])
+  levin <- sapply(resamples, B)
+  std.dev <- sd(levin)
+  list(std.dev=std.dev, levins=mean(levin))   
+}
+
+
+### Matrix of the diets for each individual (species as columns and individuals each row)
+idCols<-c("svspp","pdcomnam","pdscinam","pdsex","pdid","pdlen","day","month","year","season","geoarea","pdgutw","declon","declat")
+preyMat<-pivot_wider(prey19,id_cols=all_of(idCols),
+                     names_from=gl_prey,values_from=pyamtw,values_fn=sum)%>%
+  dplyr::select(-Empty)%>%
+  mutate(season=factor(str_to_sentence(season),levels=c("Winter","Spring","Summer","Fall")))%>%
+  filter(season%in%c("Spring","Fall"))
+preyMat[is.na(preyMat)]<-0
+#Number of prey categories
+ncol(preyMat)-length(idCols)
+
+
+levinOverTimeS<-preyMat%>%
+  mutate(pdcomnam=gsub(" ","\n",str_to_title(pdcomnam)))%>%
+  group_by(pdcomnam,season)%>%
+  summarise(levinB=as.numeric(myboot(as.matrix(across(colnames(preyMat[,(length(idCols)+1):ncol(preyMat)]))),100)))%>%
+  mutate(measure=c("levinSD","levinMean"))%>%
+  pivot_wider(id_cols=c(pdcomnam,season),names_from=measure,values_from=levinB) #Separate them into two columns
+
+
+#Prey lengths
+pylen19<-pylen19%>%
+  left_join(uniquePrey19)%>%
+  mutate(declon=-declon)%>%
+  mutate(Species=str_to_title(gsub(" ","\n",pdcomnam)),
+         species=str_to_title(pdcomnam))
+
+ 
+#What is the ratio of prey to predator lengths for the different species
+pylen19<-mutate(pylen19,pypdRatio=(pylen/10)/pdlen)
+#How does the skewness vary by the different species
+skews<-pylen19%>%
+  filter(!is.na(pypdRatio))%>%
+  group_by(Species)%>%
+  summarise(skew=round(skewness(pypdRatio),digits=4),
+            m=max(pypdRatio))
+
+
+#Dietary overlap
+#Creating a proportion matrix for the prey items for my predators
+propLong<-prey19%>%
+  mutate(species=str_to_title(pdcomnam))%>%
+  group_by(species)%>%
+  mutate(total_w=sum(pyamtw),
+         total_v=sum(pyamtv))%>%
+  group_by(species,gl_prey)%>% 
+  summarise(prop_w=sum(pyamtw)/total_w,
+            prop_v=sum(pyamtv)/total_v)%>%unique()%>%ungroup()
+
+#Following through to get the "real" overlap matrix
+props1<-propLong[,-max(ncol(propLong))] #Cut off the volume prop for cleanliness
+colnames(props1)<-c("species1","gl_prey","prop_w1")
+props2<-propLong[,-max(ncol(propLong))]
+colnames(props2)<-c("species2","gl_prey","prop_w2")
+
+overlap_schoener<-full_join(props1,props2)%>%
+  mutate(diff=abs(prop_w1-prop_w2))%>%
+  group_by(species1,species2)%>%
+  summarise(ep=sum(diff),
+            s_do=1-0.5*ep)
+
+overlap_mat<-pivot_wider(overlap_schoener,id_cols=c(species1),names_from=c(species2),values_from = s_do)
+overlap_mat<-as.matrix(overlap_mat[,2:ncol(overlap_mat)])
+for (i in 1:nrow(overlap_mat)) {
+  for (j in 1:ncol(overlap_mat)) {
+    overlap_mat[i,j]<-ifelse(j>i,NA,overlap_mat[i,j])
+  }
+}
+
+#Clustering these out
+overlap_clust<-hclust(as.dist(1-overlap_mat),method="average")
+#Trying dendextend to pretty up the dendrogram
+dend<-as.dendrogram(overlap_clust)
+
+
 ```
 
+\newpage
 
 ## Introduction
 |   The Northwest Atlantic is a highly productive ecosystem with diverse environments. It holds very high economic value as well with commercial fisheries cumulatively worth \$1.3 billion [@noaa_fisheries_2021_2021; @noaa_fisheries_2021_2021-1]. However, while the region is a focal point for marine commerce, it is also a central location in the progressive climate change occurring around the world. The Gulf of Maine, the northern end of the Northwest Atlantic, is warming faster than 99.9% of the world's oceans [@pershing_evaluating_2015]. The water body is fed primarily by cool Arctic waters, a region showing strong signals of climate change, that circulate in the deep basins, allowing them warm further. The Gulf of Maine is also linked to the south to the regions of the Georges Bank and Long Island Sound of Southern New England and the Mid-Atlantic Bight further south. These waters have historically been connected transiently, but have shown increasing homogenization in recent years.
-  
+
 |   As the Gulf of Maine circulating waters allow it to warm more quickly than its southern neighbors, the thermal conditions of this northern region have become more similar to past and present conditions of those areas. As such, recent decades have shown a rapid onset of species encroaching into the Gulf of Maine that had, historically, been seasonal visitors at most. New arrivals or expanding populations include those of the Atlantic blue crab (_Callinectes sapidus_), black sea bass (_Centropristis striata_), butterfish (_Peprilus triacanthus_), tautog (_Tautoga onitis_), and longfin squid (_Doryteuthis pealeii_) among many more. Similarly, species that have been historically abundant and important contributors to the Gulf of Maine ecosystem have shown appreciable declines due, at least in part, to climate change. These struggling species of the region include Atlantic cod (_Gadus morhua_), Northern shrimp (_Pandalus borealis_), Atlantic salmon (_Salmo salar_), with the collapse of American lobster (_Americanus homarus_) on the horizon in the eyes of many researchers. The reason for these changes in species' abundance within the region is due to the widespread pattern of range shifts experienced by marine organisms.
 
 |   Species, both in marine and terrestrial ecosystems, rely on habitable conditions that are specific to their needs. Due to progressive climate change, the conditions of a local area may become inhabitable for a species or individual that previously were. This change can result in contractions of a population's range. However, as condition changes are global, it is probable that an area previously inhabitable becomes habitable for that same species allow an expansion of their range. These two components, a push and pull on a population's range, can happen simultaneously resulting in an other shift in the areas used by a species. Work has shown that the expansion or leading edge of range shifts responds more quickly to climate change than does contraction or the lagging edge [@fredston-hermann_cold_2020]. While the general case, this directional shift in population ranges is species-specific [@fredston-hermann_cold_2020] with species moving at different rates and even different directions [@chen_rapid_2011; @pinsky_climate-driven_2020]. Even further, many species instead seek cooler water temperatures by deepening their distribution [@dulvy_climate_2008]. This plurality of responses exists both around the globe as well as within a shared community [@pinsky_climate-driven_2020]; disconnecting previously interconnected communities that had been based on overlapping distributions of species. It is theorized that climate influences marine habitat suitability more strongly at the cold, leading edge whereas biotic interactions dominate at warmer, trailing edges [@fredston-hermann_cold_2020]. These two components of species range may, additionally, interact to produce a 'double whammy' for marine populations.
@@ -202,25 +302,37 @@ speciesPrey[is.na(speciesPrey)]<-0
 
 ## Methods
 |   Diet contents for species were collected by the National Marine Fisheries Service Annual Spring-Fall Bottom Trawl Survey. The survey has been conducted throughout the Western Atlantic each spring (March-June) and fall (September-November) since 1968, with targeted species being subset to collect and analyze diets starting in 1973. The geographic extent of the survey is from Cape Hatteras, NC to the Bay of Fundy, Nova Scotia offshore to the continental shelf (Figure \ref{fig:map}). The survey follows a stratified random sample, with trawl locations being binned by the statistical areas (Figure \ref{fig:map}).
+
 |   The number of diets is highly variable across species over time (Figure \ref{fig:dietNum}). Variation is a reflection of a variety of interacting elements: abundance and accessibility together represent the actual capture rate of the species, trawling effort and diet collection quotas together represent procedural elements. Quotas were defined as the number of individual diets that should be collected from each trawl binned to different fish length intervals, e.g., 1 diet per 10 cm. Diets collected were then either analyzed at sea in all cases before 1991 or frozen for analysis in the lab in `r round(nrow(filter(uniquePrey19,fhdat=="P"))/nrow(uniquePrey19)*100)` cases after 1991. 
-|   Diet contents for an individual were first analyzed together with the total weight and volume being recorded. Empty diets were recorded accordingly. The individual components of occupied diets were identified to the greatest resolution possible by visual inspection. A total of `r nrow(itemDetails)-1` unique prey items were identified. To simplify analyses, distinct prey were grouped at varying levels of specificity: _General_ represents the coarsest resolution often at the phylum or class of identifiable items, _Analytical_ represents mid-level resolution grouping generally at order or family, and _Collection_ represents the lowest resolution and is often the genus or species. Fish were categorized with more specificity than invertebrates. A fourth method of grouping is included that is a functional blend of _Collection_ and _Analytical_ utilized by @garrison_dietary_2000 in defining feeding guilds for the entire community. The number of distinct prey categories named in each level of grouping is shown in Figure \ref{fig:preynames}.
-  NMFS Bottom Trawl Survey and Food Habits Database
-  
+
+|   Diet contents for an individual were first analyzed together with the total weight and volume being recorded. Empty diets were recorded accordingly. The individual components of occupied diets were identified to the greatest resolution possible by visual inspection. A total of `r nrow(itemDetails)-1` unique prey items were identified. To simplify analyses, distinct prey were grouped at varying levels of specificity: __General__ represents the coarsest resolution often at the phylum or class of identifiable items, __Analytical__ represents mid-level resolution grouping generally at order or family, and __Collection__ represents the lowest resolution and is often the genus or species. Fish were categorized with more specificity than invertebrates. A fourth method of grouping is included that is a functional blend of other categories utilized by @garrison_dietary_2000 in defining feeding guilds for the entire community. Namely, common prey fish species  The number of distinct prey categories named in each level of grouping is shown in Figure \ref{fig:preynames}.
+#### _Data Summaries_
+|
+|   To initiate the exploration of dietary structure changes in time and space, it is first important to characterize species diets through a variety of metrics. These metrics may rely on a significant number of diets to be calculated accurately, but can otherwise be calculated for subsets across regions, seasons, and years for each of the species. The simplest method of assessing diet is to compare the size of the diet, either by the volume or mass. When using the mass, it is common that such a value is made relative to the mass of the fish to better compare the magnitude of feeding. Related to feeding magnitude, the mere presence of stomach contents can help to approximate the frequency of feeding. As such, the proportion of stomachs found empty can be used in characterizing foraging strategies and success. The second metric commonly used to characterize a fish diet is to calculate an index of diversity, such as Levin's Diet Breadth. The formula for Levin's breadth is:
+$$B_a=\frac {\frac {1} {\sum p_j^2} -1} {n-1}$$
+where $p_j$ is the proportion of the diet represented by diet item $j$, and $n$ is the total number of diet items to standardize the breadth measures between 0-1. A third metric for diets reflects the sizes of prey items, both by relating prey size to predator size and evaluating the distributions of relative prey size. Beyond a simple linear regression of the mean prey length against predator length, a regression for the 5th and 95th prey length percentiles can reveal the scope of prey size at different predator sizes. Relative prey size indicates what type of prey a species may select beyond prey identification, such as only feeding on items much smaller than oneself, taking primarily large prey near ones own size, or showing no preference for prey size. These patterns can be summarized by calculating skewness of the relative prey size distributions where higher skew represents higher selectivity. Finally, predators can be compared to each other and intra-specifically by calculating dietary overlap. Again, a variety of indices exist for calculating overlap, but one popularly used due to its simplicity is Schoener's Overlap [@schoener_nonsynchronous_1970] calculated as:
+$$S_a=1-0.5*\sum |p_{1,j}-p_{2,j}|$$
+where $p_1$ and $p_2$ represent the proportions of the $j$ diet item in predators $1$ and $2$, respectively. A matrix of overlap comparisons across all relevant groups can be constructed, then clustering is used to partition out similar groups.
   
   
 ## Discussion
 
 The predators show signs of predation upon each other, however this is largely focused on Silver Hake, even when that requires cannibalism (Figure \ref{fig:selfprey}).
 
-  
+\newpage
+
+## References
+
+<div id="refs"></div>
+ 
+\newpage
+
 ## Figures
-  
+
+__Figure \ref{fig:map}__
 
 
-
-
-
-``` {r mapping, echo=F, message=F, warning=F,fig.width=11,fig.height=11,fig.cap="Map of the trawl positions overlain by the NMFS Statistical areas.\\label{fig:map}"}
+``` {r mapping, echo=F, message=F, warning=F,fig.width=11,fig.height=11,fig.cap="Map of the starting points for all trawls from across all years and dates from the Annual Bottom Trawl Survey. Point colors correspond to broad geographic regions: the Mid-Atlantic Bight, Southern New England, Georges Bank, Gulf of Maine, and Scotian Shelf. Black outlines show the NMFS Statistical areas used to stratify sampling.\\label{fig:map}"}
 
 
 
@@ -247,7 +359,9 @@ ggplot()+
 
 ```
 
+\newpage
 
+__Figure \ref{fig:dietNum}__
 
 
 ``` {r data summary, echo=F, message=F,warning=F,fig.width=20,fig.height=15,fig.cap="Number of diets collected for each of 9 target predator species by the National Marine Fisheries Service during the annual Spring-Fall Bottom Trawl Survey since 1973. Differences represent predator availability as well as research prioritization, both of which have varied over time. The minimum number of diets collected by a season of trawls is noted in each panel, along with the season in which it occurred. If the minimum number of diets for a species occurred in multiple seasons, the number of seasons is listed instead.\\label{fig:dietNum}"}
@@ -276,6 +390,10 @@ uniquePrey19%>%
 
 ```
 
+\newpage
+
+__Figure \ref{fig:preynames}__
+
 
 ``` {r prey summary, echo=F, message=F, warning=F,fig.height=6,fig.width=10,fig.cap="Number of unique prey names at each level of resolution. General, Analytical, and Collection scales refer to groupings provided by the National Marine Fisheries Service; Prey name is the most specific a visual observer could identify an item to; and cf. Garrison and Link, 2000 refers to that grouping used in their feeding guild analyses.\\label{fig:preynames}"}
 
@@ -296,6 +414,38 @@ itemDetails%>%
   
 ```
 
+\newpage
+
+__Figure \ref{fig:relConsump}__
+
+
+``` {r consump, echo=F, message=F, warning=F,fig.height=6,fig.width=10,fig.cap="Relative consumption as the mass of the diet over the mass of the fish for each of the focal predators. Note the log-scale for the y-axis.\\label{fig:relConsump}"}
+
+ 
+uniquePrey19%>%
+  mutate(pdcomnam=str_to_title(gsub(" ","\n",pdcomnam)),
+         relConsump=pdgutw/pdwgt)%>%
+  filter(relConsump>0 & relConsump<1)%>% #Only keep those that have a fish and diet weight
+  ggplot()+
+  geom_jitter(aes(fct_reorder(pdcomnam,relConsump),relConsump,color=pdcomnam),
+              shape=21,alpha=0.75,width=0.125)+
+  geom_boxplot(aes(fct_reorder(pdcomnam,relConsump),relConsump,fill=pdcomnam),outlier.shape=NA,
+               size=1.5,color="black",alpha=0.5)+
+  theme(legend.position = "none")+
+  scale_fill_manual(values=colorspace::rainbow_hcl(9,c=100,l=60))+
+  scale_color_manual(values=colorspace::rainbow_hcl(9,c=100,l=60))+
+  scale_x_discrete(name="Predator Species")+
+  scale_y_log10(name="Relative Consumption (g/g)",
+                breaks=c(0.00001,0.0001,0.001,0.01,0.1,1),labels=function(x) format(x,scientific=F))
+
+
+
+```
+
+
+\newpage
+
+__Figure \ref{fig:empty}__
 
 
 ``` {r emptiness, echo=F,message=F,warning=F,fig.width=24,fig.height=24,fig.cap="Percentage of stomachs that are empty over time for each of the predator species in each of the geographic regions. The rightmost columns represents the cumulative across regions for each species. The bottom row represents the cumulative across species for each region. Horizontal red lines in each show the mean across all years for that subset. Regions are ordered by increasing latitude from left to right, species are ordered by increasing percentage of empty stomachs from top to bottom.\\label{fig:empty}"}
@@ -374,8 +524,8 @@ a<-prey19%>%
   scale_x_continuous(name="Year")+
   scale_y_continuous(name="Percent Empty Stomachs (%)",limits=c(0,100))+
   #scale_size_continuous(name="Number of\nDiets",range=c(1.5,7))+
-  scale_fill_manual(values=colorspace::rainbow_hcl(9,c=100,l=50))+
-  scale_color_manual(values=colorspace::rainbow_hcl(9,c=100,l=50))+
+  scale_fill_manual(values=colorspace::rainbow_hcl(9,c=100,l=60))+
+  scale_color_manual(values=colorspace::rainbow_hcl(9,c=100,l=60))+
   scale_shape_manual(values=c(21:25))+
   guides(fill="none",shape="none")+
   theme(plot.margin=unit(c(12.5,15,15,12.5),"pt"))+
@@ -396,9 +546,98 @@ grid.arrange(a,s,g,nrow=2,layout_matrix=rbind(c(1,1,1,2),
 
 ```
 
+\newpage
+
+__Figure \ref{fig:levin}__
 
 
-``` {r investigating, echo=F,message=F,warning=F,fig.width=12,fig.height=8,fig.cap="Proportion of consumption for each predator species of the other predator species, including cannibalism. Red lines represent the total proportion on self and other target predator species. Prey names include the number of instances of predation upon that species. Note square-root scale for proportions.\\label{fig:selfprey}"}
+``` {r breadth, echo=F,message=F,warning=F,fig.width=10,fig.height=6,fig.cap="Mean Levin's Niche Breadth for each focal predator in the two major seasons collected. Errorbars represent standard deviation as calculated from 100 bootstrap resamples.\\label{fig:levin}"}
+
+#Plotting
+levinOverTimeS%>%
+  ggplot(aes(fct_reorder(pdcomnam,levinMean),levinMean,fill=season))+
+  geom_col(color="black",position=position_dodge(0.9))+
+  geom_errorbar(aes(ymin=levinMean-levinSD,ymax=levinMean+levinSD),position=position_dodge(0.9),width=0.25)+
+  theme(legend.position=c(0.15,0.8),legend.background = element_rect(color="black"))+
+  scale_fill_manual(values=seasonPal2[c(2,4)],name="Season")+
+  scale_y_continuous(name="Levin's Niche Breadth")+
+  scale_x_discrete(name="Predator Species")
+  
+
+```
+
+\newpage
+
+__Figure \ref{fig:pylen}__
+
+
+``` {r sizes, echo=F,message=F,warning=F,fig.width=20,fig.height=10,fig.cap="Relationship of the sizes of predators to the sizes of their prey showing the (left) range of prey sizes against all predator sizes and (right) distribution of relative prey sizes. The solid line in each panel represents the mean prey size, dashed lines represent the 5th and 95th percentile prey sizes. Skewness scores are listed above each species violin plot with increasing skewness, on the right, showing higher selectivity for prey size.\\label{fig:pylen}"}
+
+
+#How do the predators compare to their prey
+r<-pylen19%>%
+  filter(!is.na(pdcomnam))%>%
+  ggplot()+
+  geom_abline(aes(slope=1,intercept=0))+
+  geom_point(aes(pdlen,pylen/10,color=Species),shape=21,size=2,fill="transparent")+
+  geom_smooth(aes(pdlen,pylen/10),method="lm",lty=1,se=F,color="black")+ #Mean line
+  geom_smooth(data=pylen19%>%filter(!is.na(pdcomnam))%>%mutate(lengths=as.character(pdlen))%>%
+                    group_by(species,lengths)%>%mutate(N=n())%>%filter(pylen>=quantile(pylen,probs=0.95,na.rm=T)),
+             aes(pdlen,pylen/10),method="lm",lty=3,se=F,color="black")+ #Max prey size line
+  geom_smooth(data=pylen19%>%filter(!is.na(pdcomnam))%>%mutate(lengths=as.character(pdlen))%>%
+                group_by(species,lengths)%>%mutate(N=n())%>%filter(pylen<=quantile(pylen,probs=0.05,na.rm=T)),
+              aes(pdlen,pylen/10),method="lm",lty=3,se=F,color="black")+ #Min prey size line
+  scale_color_manual(values=colorspace::rainbow_hcl(9,c=100,l=60),guide="none")+
+  scale_x_continuous(limits=c(0,130),expand=expansion(mult=0.01),name="Predator length (cm)")+
+  scale_y_continuous(limits=c(0,130),expand=expansion(mult=0.01),name="Prey length (cm)")+
+  theme(legend.position=c(0.33,0.75),legend.background=element_rect(color="black",fill="white"))+
+  facet_wrap(~species)
+
+v<-pylen19%>%
+  filter(!is.na(pdcomnam))%>%
+  left_join(skews)%>%
+  ggplot()+
+  geom_point(aes(fct_reorder(Species,skew),pypdRatio,fill=Species),shape=21,alpha=0.8,size=2,show.legend=F)+
+  geom_violin(aes(fct_reorder(Species,skew),pypdRatio,fill=Species),size=1.5,show.legend=F)+
+  geom_text(data=skews,aes(Species,m+0.05,label=skew),size=6)+
+  scale_fill_manual(values=colorspace::rainbow_hcl(9,c=100,l=60))+
+  scale_y_continuous(name="Ratio of Prey Length:Predator Length",expand=expansion(add=c(0.0325,0.112)))+
+  scale_x_discrete(name="Predator Species")
+
+grid.arrange(r,v,nrow=1)
+
+
+```
+
+\newpage
+
+__Figure \ref{fig:schoener}__
+
+``` {r overlap, echo=F,message=F,warning=F,fig.height=6,fig.cap="Focal predators clustered by similarity in diet composition according. Hierarchical agglomerative clustering using the group average was performed from a matrix of Schoener's dietary overlap to generate this dendrogram.\\label{fig:schoener}"}
+
+
+dend %>% 
+  set("branches_lwd", 2) %>%
+  # Custom labels
+  set("labels_cex",1)%>%
+  set("labels",gsub(" ","\n",labels(dend)))%>%
+  as.ggdend()%>%
+  ggplot(horiz=T,offset_labels=-0.01)+
+  theme_void()
+
+#grid.arrange(m,d,nrow=3,layout_matrix=rbind(c(1,1,1,1),
+#                                            c(1,1,1,1),
+#                                            c(2,2,2,NA)))
+
+
+```
+
+\newpage
+
+__Figure \ref{fig:selfprey}__
+
+
+``` {r cannibal, echo=F,message=F,warning=F,fig.width=12,fig.height=8,fig.cap="Proportion of consumption for each predator species of the other predator species, including cannibalism. Red lines represent the total proportion on self and other target predator species. Prey names include the number of instances of predation upon that species. Note square-root scale for proportions.\\label{fig:selfprey}"}
 
 ggplot(speciesPrey,aes(fct_reorder(pdscinam,total_prop),prop_prey,fill=preyLab))+
   geom_col(position = "dodge",color="black",size=0.5)+
@@ -414,18 +653,4 @@ ggplot(speciesPrey,aes(fct_reorder(pdscinam,total_prop),prop_prey,fill=preyLab))
 
 
 ```
-
-
-
-
-
-
-
-
-
-
-
-## References
-
-
 
