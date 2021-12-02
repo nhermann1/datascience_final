@@ -21,6 +21,7 @@ library(ggspatial)
 library(gridExtra)
 library(moments)
 library(dendextend)
+library(colorspace)
 
 
 theme_set(theme_bw(base_size=22))
@@ -181,16 +182,28 @@ speciesPrey<-prey19%>%
   count(pynam,pdscinam,total_items,.drop=F,name="n_prey")%>%
   mutate(prop_prey=n_prey/total_items,
          preyLab=str_to_sentence(pynam),
-         preyLab=factor(preyLab,levels=str_to_sentence(myspecies_sci)),
          pdscinam=gsub(" ","\n",str_to_sentence(pdscinam)))%>%
   group_by(pdscinam)%>%
   mutate(total_prop=sum(prop_prey,na.rm=T))%>%
   group_by(pynam)%>%
   mutate(total_eaten=sum(n_prey),
-         prop_eaten=total_eaten/nrow(prey19),
-         nchars=nchar(as.character(preyLab)))
+         prop_eaten=total_eaten/nrow(prey19))
 speciesPrey[is.na(speciesPrey)]<-0
 
+species_scicom<-prey19%>%
+  dplyr::select(pdcomnam,pdscinam)%>%distinct()%>%
+  mutate(preyComLab=str_to_title(pdcomnam),
+         pdcomnam=gsub(" ","\n",str_to_title(pdcomnam)),
+         preyLab=str_to_sentence(pdscinam),
+         pdscinam=gsub(" ","\n",str_to_sentence(pdscinam)))
+
+for (i in 1:nrow(species_scicom)) {
+  speciesPrey[,"pdscinam"][speciesPrey[,"pdscinam"]==species_scicom[i,2]]<-species_scicom[i,1]
+  speciesPrey[,"preyLab"][speciesPrey[,"preyLab"]==species_scicom[i,4]]<-species_scicom[i,3]
+}
+
+speciesPrey<-mutate(speciesPrey,nchars=nchar(as.character(preyLab)))%>%
+  arrange(preyLab)
 
 #Levin's Niche Breadth, in different seasons
 
@@ -341,7 +354,7 @@ ggplot()+
   geom_polygon(data=states,aes(long,lat,group=group),fill="transparent",color="grey50")+
   geom_spatial_point(data=prey19,aes(-1*declon,declat,color=geoarea),crs=4326)+
   geom_sf(data=statAreas,fill="transparent",col="black")+
-  scale_color_manual(values=colorspace::rainbow_hcl(5,c=100,end=290),name="Geographic\nRegion")+
+  scale_color_discrete_sequential(palette="Hawaii",name="Geographic\nRegion",l2=80)+
   guides(color=guide_legend(override.aes = list(size=9)))+
   annotation_scale(location="br",width_hint=0.4,height=unit(0.125,"in"),
                    pad_x=unit(0.25,"in"),pad_y=unit(0.4,"in"),text_cex=1.2)+
@@ -376,11 +389,11 @@ uniquePrey19%>%
   filter(count>0)%>%ungroup()%>%
   mutate(yearseason=ifelse(season=="Spring",as.numeric(as.character(year))-0.25,as.numeric(as.character(year))+0.25),
          g = c(0, cumsum(diff(yearseason) > 0.5))) %>%
- ggplot()+
+  ggplot()+
   geom_line(aes(yearseason,count,color=pdcomnam,group=g),size=1.5)+
   geom_point(aes(yearseason,count,fill=season,color=pdcomnam,group=g),size=3,shape=21,stroke=2)+
-  geom_text(data=min,aes(2010,2010,label=paste0("Min=",min,": ",minyearseason)),size=7)+
-  scale_color_manual(values=colorspace::rainbow_hcl(9,c=100,l=60),guide="none")+
+  geom_text(data=min,aes(2005,2010,label=paste0("Min=",min,": ",minyearseason)),size=7)+
+  scale_color_manual(values=rainbow_hcl(9,c=100,l=60),guide="none")+
   scale_fill_manual(values=seasonPal2[c(2,4)],name="Season")+
   scale_y_continuous(expand=expansion(mult=c(0.035,0.1)),name="Number of Diets Collected")+
   scale_x_continuous(name="Year")+
@@ -432,11 +445,12 @@ uniquePrey19%>%
   geom_boxplot(aes(fct_reorder(pdcomnam,relConsump),relConsump,fill=pdcomnam),outlier.shape=NA,
                size=1.5,color="black",alpha=0.5)+
   theme(legend.position = "none")+
-  scale_fill_manual(values=colorspace::rainbow_hcl(9,c=100,l=60))+
-  scale_color_manual(values=colorspace::rainbow_hcl(9,c=100,l=60))+
+  scale_fill_manual(values=rainbow_hcl(9,c=100,l=60))+
+  scale_color_manual(values=rainbow_hcl(9,c=100,l=60))+
   scale_x_discrete(name="Predator Species")+
   scale_y_log10(name="Relative Consumption (g/g)",
-                breaks=c(0.00001,0.0001,0.001,0.01,0.1,1),labels=function(x) format(x,scientific=F))
+                breaks=c(0.00001,0.0001,0.001,0.01,0.1,1),labels=function(x) format(x,scientific=F))+
+  theme(axis.text.x=element_text(size=15))
 
 
 
@@ -468,12 +482,11 @@ s<-prey19%>%
   geom_abline(aes(slope=0,intercept=total_p_empty),color="firebrick2",size=1.5)+
   geom_line(size=2)+
   geom_point(size=3,shape=21,stroke=1.5,color="black")+
-  scale_x_continuous(name="Year")+
-  scale_y_continuous(name="Percent Empty Stomachs (%)",limits=c(0,100))+
-  #scale_size_continuous(name="Number of\nDiets",range=c(1.5,7))+
-  scale_fill_manual(values=colorspace::rainbow_hcl(9,c=100,l=60))+
-  scale_color_manual(values=colorspace::rainbow_hcl(9,c=100,l=60))+
-  theme(legend.position = "none")+
+  scale_x_continuous(name=" ")+
+  scale_y_continuous(limits=c(0,100))+
+  scale_fill_manual(values=rainbow_hcl(9,c=100,l=60))+
+  scale_color_manual(values=rainbow_hcl(9,c=100,l=60))+
+  theme(legend.position = "none",axis.title.y=element_blank(),axis.text.y=element_blank(),axis.title.x=element_text(size=40))+
   facet_wrap(~f.pdcomnam,nrow=9)
  
 
@@ -496,8 +509,8 @@ g<-prey19%>%
   geom_line(color="black",size=2)+
   geom_point(fill="black",size=3,stroke=1.5)+
   scale_x_continuous(name="Year")+
-  scale_y_continuous(name="Percent Empty Stomachs (%)",limits=c(0,100))+
-  #scale_size_continuous(name="Number of\nDiets",range=c(1.5,7))+
+  scale_y_continuous(name=" ",limits=c(0,100))+
+  theme(axis.title=element_text(size=40))+
   scale_shape_manual(values=c(21:25),guide="none")+
   facet_wrap(~geoarea,nrow=1)
 
@@ -523,12 +536,12 @@ a<-prey19%>%
   geom_point(size=3,stroke=1.25,color="black")+
   scale_x_continuous(name="Year")+
   scale_y_continuous(name="Percent Empty Stomachs (%)",limits=c(0,100))+
-  #scale_size_continuous(name="Number of\nDiets",range=c(1.5,7))+
-  scale_fill_manual(values=colorspace::rainbow_hcl(9,c=100,l=60))+
-  scale_color_manual(values=colorspace::rainbow_hcl(9,c=100,l=60))+
+  scale_fill_manual(values=rainbow_hcl(9,c=100,l=60))+
+  scale_color_manual(values=rainbow_hcl(9,c=100,l=60))+
   scale_shape_manual(values=c(21:25))+
   guides(fill="none",shape="none")+
-  theme(plot.margin=unit(c(12.5,15,15,12.5),"pt"))+
+  theme(plot.margin=unit(c(12.5,15,15,12.5),"pt"),axis.title.y=element_text(size=40),
+        axis.title.x=element_blank(),axis.text.x=element_blank())+
   facet_wrap(~f.pdcomnam+geoarea,nrow=9,labeller = label_wrap_gen(multi_line=FALSE))
 
 
@@ -558,7 +571,8 @@ levinOverTimeS%>%
   ggplot(aes(fct_reorder(pdcomnam,levinMean),levinMean,fill=season))+
   geom_col(color="black",position=position_dodge(0.9))+
   geom_errorbar(aes(ymin=levinMean-levinSD,ymax=levinMean+levinSD),position=position_dodge(0.9),width=0.25)+
-  theme(legend.position=c(0.15,0.8),legend.background = element_rect(color="black"))+
+  theme(legend.position=c(0.15,0.8),legend.background = element_rect(color="black"),
+        axis.text.x=element_text(size=15))+
   scale_fill_manual(values=seasonPal2[c(2,4)],name="Season")+
   scale_y_continuous(name="Levin's Niche Breadth")+
   scale_x_discrete(name="Predator Species")
@@ -587,7 +601,7 @@ r<-pylen19%>%
   geom_smooth(data=pylen19%>%filter(!is.na(pdcomnam))%>%mutate(lengths=as.character(pdlen))%>%
                 group_by(species,lengths)%>%mutate(N=n())%>%filter(pylen<=quantile(pylen,probs=0.05,na.rm=T)),
               aes(pdlen,pylen/10),method="lm",lty=3,se=F,color="black")+ #Min prey size line
-  scale_color_manual(values=colorspace::rainbow_hcl(9,c=100,l=60),guide="none")+
+  scale_color_manual(values=rainbow_hcl(9,c=100,l=60),guide="none")+
   scale_x_continuous(limits=c(0,130),expand=expansion(mult=0.01),name="Predator length (cm)")+
   scale_y_continuous(limits=c(0,130),expand=expansion(mult=0.01),name="Prey length (cm)")+
   theme(legend.position=c(0.33,0.75),legend.background=element_rect(color="black",fill="white"))+
@@ -600,9 +614,10 @@ v<-pylen19%>%
   geom_point(aes(fct_reorder(Species,skew),pypdRatio,fill=Species),shape=21,alpha=0.8,size=2,show.legend=F)+
   geom_violin(aes(fct_reorder(Species,skew),pypdRatio,fill=Species),size=1.5,show.legend=F)+
   geom_text(data=skews,aes(Species,m+0.05,label=skew),size=6)+
-  scale_fill_manual(values=colorspace::rainbow_hcl(9,c=100,l=60))+
+  scale_fill_manual(values=rainbow_hcl(9,c=100,l=60))+
   scale_y_continuous(name="Ratio of Prey Length:Predator Length",expand=expansion(add=c(0.0325,0.112)))+
-  scale_x_discrete(name="Predator Species")
+  scale_x_discrete(name="Predator Species")+
+  theme(axis.text.x=element_text(size=15))
 
 grid.arrange(r,v,nrow=1)
 
@@ -625,10 +640,6 @@ dend %>%
   ggplot(horiz=T,offset_labels=-0.01)+
   theme_void()
 
-#grid.arrange(m,d,nrow=3,layout_matrix=rbind(c(1,1,1,1),
-#                                            c(1,1,1,1),
-#                                            c(2,2,2,NA)))
-
 
 ```
 
@@ -639,16 +650,22 @@ __Figure \ref{fig:selfprey}__
 
 ``` {r cannibal, echo=F,message=F,warning=F,fig.width=12,fig.height=8,fig.cap="Proportion of consumption for each predator species of the other predator species, including cannibalism. Red lines represent the total proportion on self and other target predator species. Prey names include the number of instances of predation upon that species. Note square-root scale for proportions.\\label{fig:selfprey}"}
 
+fonts <- list(
+  sans = "Helvetica",
+  mono = "Consolas",
+  `Times New Roman` = "DejaVu Serif"
+)
+
 ggplot(speciesPrey,aes(fct_reorder(pdscinam,total_prop),prop_prey,fill=preyLab))+
   geom_col(position = "dodge",color="black",size=0.5)+
-  geom_errorbar(aes(ymin=total_prop,ymax=total_prop), color = "firebrick3") +
+  geom_errorbar(aes(ymin=total_prop,ymax=total_prop), color = "firebrick3")+
   #geom_segment(aes(x=pdscinam-1,xend=pdscinam,y=total_prop,yend=total_prop),size=5,shape=22,fill="firebrick2")+
   scale_x_discrete(name="Predator Species")+
   scale_y_sqrt(name="Proportion of Predator Diet",expand=expansion(add=c(0.001,0.01)))+
   scale_fill_viridis_d(name="Prey Species", 
-                       labels=paste0(speciesPrey$preyLab,strrep(" ",25-speciesPrey$nchars),"(n=",speciesPrey$total_eaten,")"))+
-  theme(legend.position=c(0.7,0.25),legend.background=element_rect(color="black"),
-        legend.text=element_text(family="mono",size=15))+
+                       labels=c(speciesPrey%>%group_by(preyLab)%>%summarise(lab=paste0(unique(preyLab),strrep(" ",max(speciesPrey$nchars)-unique(nchars)+1), "(n=",unique(total_eaten),")"))%>%select(lab))$lab)+
+  theme(legend.position=c(0.75,0.25),legend.background=element_rect(color="black"),
+        legend.text=element_text(family="mono",size=15,face="bold"))+
   coord_flip()
 
 
